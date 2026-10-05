@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
-import { Avatar, Divider, List, Searchbar, Text, useTheme } from 'react-native-paper';
+import { Avatar, Divider, List, Text, useTheme } from 'react-native-paper';
 import { Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { EmptyView, ErrorView, LoadingView } from '@/components';
+import { CampoBusca, EmptyView, ErrorView, LoadingView } from '@/components';
 import { listarEstados } from '@/services';
 import { borderRadius, spacing } from '@/theme';
 import { Estado } from '@/types';
@@ -116,12 +116,10 @@ export default function SelectingStateScreen() {
           <Text variant="bodyLarge" style={[styles.headerDescription, { color: theme.colors.onSurface }]}>
             Encontre farmácias do Programa Farmácia Popular. Escolha seu estado para começar.
           </Text>
-          <Searchbar
+          <CampoBusca
             placeholder="Buscar estado por nome ou sigla..."
             onChangeText={setSearchQuery}
             value={searchQuery}
-            style={styles.searchbar}
-            elevation={1}
             accessibilityLabel="Campo de busca por nome ou sigla do estado"
           />
         </View>
