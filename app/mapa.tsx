@@ -1,10 +1,10 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Card, Text, useTheme } from 'react-native-paper';
 
 import { ErrorView, LoadingView } from '@/components';
+import { MapViewContainer } from '@/components/MapViewContainer';
 import { listarFarmacias } from '@/services';
 import { spacing } from '@/theme';
 import { Farmacia } from '@/types';
@@ -19,7 +19,7 @@ const INITIAL_REGION = {
 
 export default function MapScreen() {
   const theme = useTheme();
-  const mapRef = useRef<MapView | null>(null);
+  const mapRef = useRef<any>(null);
 
   const { municipioId, nome, uf } = useLocalSearchParams<{
     municipioId?: string;
@@ -126,32 +126,12 @@ export default function MapScreen() {
         }}
       />
       <View style={styles.container}>
-        <MapView
+        <MapViewContainer
           ref={mapRef}
-          provider={PROVIDER_GOOGLE}
-          style={styles.map}
           initialRegion={INITIAL_REGION}
-          showsUserLocation={false}
-          showsMyLocationButton={false}
-          zoomControlEnabled={true}
-          // Desativamos a toolbar nativa do Google Maps para evitar que os botões nativos
-          // de "Abrir no Maps / Rota" se sobreponham e conflitem com o Bottom Sheet de detalhes
-          toolbarEnabled={false}
-        >
-          {farmacias.map((farmacia) => (
-            <Marker
-              key={farmacia.id}
-              coordinate={{
-                latitude: farmacia.latitude,
-                longitude: farmacia.longitude,
-              }}
-              title={farmacia.nome}
-              description={`${farmacia.endereco} - ${farmacia.bairro}`}
-              pinColor={theme.colors.primary}
-              onPress={() => setFarmaciaSelecionada(farmacia)}
-            />
-          ))}
-        </MapView>
+          farmacias={farmacias}
+          onSelectFarmacia={setFarmaciaSelecionada}
+        />
 
         {farmacias.length === 0 && (
           <View style={styles.emptyOverlay}>

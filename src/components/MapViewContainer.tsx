@@ -1,19 +1,33 @@
 import React, { forwardRef } from 'react';
-import { StyleSheet, View } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
+import { Platform, StyleSheet, View } from 'react-native';
 import { useTheme } from 'react-native-paper';
 
 import { Farmacia } from '@/types';
 
+let MapView: any = null;
+let Marker: any = null;
+let PROVIDER_GOOGLE: any = null;
+
+if (Platform.OS !== 'web') {
+  const Maps = require('react-native-maps');
+  MapView = Maps.default || Maps;
+  Marker = Maps.Marker;
+  PROVIDER_GOOGLE = Maps.PROVIDER_GOOGLE;
+}
+
 interface MapViewContainerProps {
-  initialRegion: Region;
+  initialRegion: any;
   farmacias: Farmacia[];
   onSelectFarmacia: (farmacia: Farmacia) => void;
 }
 
-export const MapViewContainer = forwardRef<MapView, MapViewContainerProps>(
+export const MapViewContainer = forwardRef<any, MapViewContainerProps>(
   ({ initialRegion, farmacias, onSelectFarmacia }, ref) => {
     const theme = useTheme();
+
+    if (Platform.OS === 'web' || !MapView) {
+      return null;
+    }
 
     return (
       <View style={styles.container}>
