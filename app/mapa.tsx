@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Stack, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Card, Text, useTheme } from 'react-native-paper';
-import { Stack, useLocalSearchParams } from 'expo-router';
 
 import { ErrorView, LoadingView } from '@/components';
 import { listarFarmacias } from '@/services';
