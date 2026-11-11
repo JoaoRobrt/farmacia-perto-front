@@ -1,19 +1,18 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import { Divider, List, Text, useTheme } from 'react-native-paper';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CampoBusca, EmptyView, ErrorView, LoadingView } from '@/components';
+import { useCarregamento } from '@/hooks/useCarregamento';
 import { listarMunicipios } from '@/services';
 import { spacing } from '@/theme';
 import { Municipio } from '@/types';
+import { normalizarBusca } from '@/utils/texto';
 
-function removeAccents(str: string): string {
-  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-}
-
-const ITEM_HEIGHT = 57; // 56px item + 1px divider
+// Altura fixa do item (56) + divisor (1), usada pelo getItemLayout.
+const ITEM_HEIGHT = 57;
 
 export default function SelectingMunicipalityScreen() {
   const theme = useTheme();
@@ -21,51 +20,38 @@ export default function SelectingMunicipalityScreen() {
   const insets = useSafeAreaInsets();
   const { uf } = useLocalSearchParams<{ uf?: string }>();
 
-  const ufSigla = (uf || 'PB').toUpperCase();
+  const ufSigla = uf?.toUpperCase() ?? '';
 
-  const [municipios, setMunicipios] = useState<Municipio[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const carregarMunicipios = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await listarMunicipios(ufSigla);
-      setMunicipios(data);
-    } catch (err: any) {
-      setError(err?.message || 'Erro ao carregar os municípios.');
-    } finally {
-      setLoading(false);
-    }
-  }, [ufSigla]);
-
-  useEffect(() => {
-    carregarMunicipios();
-  }, [carregarMunicipios]);
+  const buscarMunicipios = useCallback(
+    () => (ufSigla ? listarMunicipios(ufSigla) : Promise.resolve([])),
+    [ufSigla]
+  );
+  const {
+    dados: municipios,
+    loading,
+    error,
+    recarregar,
+  } = useCarregamento<Municipio[]>(buscarMunicipios, [], 'Não foi possível carregar os municípios.');
 
   const municipiosFiltrados = useMemo(() => {
-    if (!searchQuery.trim()) {
+    const queryFormatada = normalizarBusca(searchQuery);
+    if (!queryFormatada) {
       return municipios;
     }
-    const queryFormatada = removeAccents(searchQuery);
-    return municipios.filter((m) => removeAccents(m.nome).includes(queryFormatada));
+    return municipios.filter((m) => normalizarBusca(m.nome).includes(queryFormatada));
   }, [municipios, searchQuery]);
 
   const handleSelectMunicipio = (item: Municipio) => {
     router.push({
-      pathname: '/mapa' as any,
-      params: {
-        municipioId: item.id,
-        nome: item.nome,
-        uf: item.uf,
-      },
+      pathname: '/mapa',
+      params: { municipioId: item.id, nome: item.nome, uf: item.uf },
     });
   };
 
   const getItemLayout = useCallback(
-    (_data: any, index: number) => ({
+    (_data: ArrayLike<Municipio> | null | undefined, index: number) => ({
       length: ITEM_HEIGHT,
       offset: ITEM_HEIGHT * index,
       index,
@@ -74,12 +60,22 @@ export default function SelectingMunicipalityScreen() {
   );
 
   const renderContent = () => {
+    if (!ufSigla) {
+      return (
+        <ErrorView
+          message="Nenhum estado foi informado. Volte e selecione um estado."
+          onRetry={() => router.replace('/')}
+          retryLabel="Escolher estado"
+        />
+      );
+    }
+
     if (loading) {
       return <LoadingView message={`Carregando municípios de ${ufSigla}...`} />;
     }
 
     if (error) {
-      return <ErrorView message={error} onRetry={carregarMunicipios} />;
+      return <ErrorView message={error} onRetry={recarregar} />;
     }
 
     return (
@@ -96,7 +92,7 @@ export default function SelectingMunicipalityScreen() {
           { paddingBottom: insets.bottom + spacing.md },
           municipiosFiltrados.length === 0 && styles.emptyContainer,
         ]}
-        ItemSeparatorComponent={() => <Divider />}
+        ItemSeparatorComponent={Divider}
         ListEmptyComponent={
           <EmptyView
             title="Nenhum município encontrado"
@@ -127,12 +123,17 @@ export default function SelectingMunicipalityScreen() {
     <>
       <Stack.Screen
         options={{
-          title: `Municípios — ${ufSigla}`,
+          title: ufSigla ? `Municípios — ${ufSigla}` : 'Municípios',
           headerBackTitle: 'Voltar',
         }}
       />
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <View style={[styles.headerCard, { backgroundColor: theme.colors.surface }]}>
+        <View
+          style={[
+            styles.headerCard,
+            { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.outlineVariant },
+          ]}
+        >
           <Text variant="bodyMedium" style={[styles.headerSubtitle, { color: theme.colors.onSurfaceVariant }]}>
             Selecione o município desejado no estado de {ufSigla}
           </Text>
@@ -157,7 +158,6 @@ const styles = StyleSheet.create({
   headerCard: {
     padding: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E2EC',
   },
   headerSubtitle: {
     marginBottom: spacing.sm,

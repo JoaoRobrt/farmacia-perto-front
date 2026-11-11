@@ -23,6 +23,7 @@ export const theme: MD3Theme = {
     errorContainer: '#FFDAD6',
     onErrorContainer: '#410002',
     outline: '#74777F',
+    outlineVariant: '#E0E2EC',
   },
 };
 

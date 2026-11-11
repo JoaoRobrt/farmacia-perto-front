@@ -1,6 +1,5 @@
-import React from 'react';
 import { StyleProp, StyleSheet, ViewStyle } from 'react-native';
-import { Searchbar } from 'react-native-paper';
+import { Searchbar, useTheme } from 'react-native-paper';
 
 import { borderRadius } from '@/theme';
 
@@ -19,12 +18,14 @@ export function CampoBusca({
   accessibilityLabel = 'Campo de busca',
   style,
 }: CampoBuscaProps) {
+  const theme = useTheme();
+
   return (
     <Searchbar
       placeholder={placeholder}
       onChangeText={onChangeText}
       value={value}
-      style={[styles.searchbar, style as any]}
+      style={[styles.searchbar, { backgroundColor: theme.colors.background }, style]}
       elevation={1}
       accessibilityLabel={accessibilityLabel}
     />
@@ -34,6 +35,5 @@ export function CampoBusca({
 const styles = StyleSheet.create({
   searchbar: {
     borderRadius: borderRadius.md,
-    backgroundColor: '#F1F3F9',
   },
 });
