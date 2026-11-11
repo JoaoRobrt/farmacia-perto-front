@@ -1,61 +1,52 @@
-import React, { forwardRef } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { forwardRef } from 'react';
+import { StyleSheet } from 'react-native';
+import MapView, { MapPressEvent, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useTheme } from 'react-native-paper';
 
-import { Farmacia } from '@/types';
+import { MapViewContainerProps } from './MapViewContainer.types';
 
-let MapView: any = null;
-let Marker: any = null;
-let PROVIDER_GOOGLE: any = null;
-
-if (Platform.OS !== 'web') {
-  const Maps = require('react-native-maps');
-  MapView = Maps.default || Maps;
-  Marker = Maps.Marker;
-  PROVIDER_GOOGLE = Maps.PROVIDER_GOOGLE;
-}
-
-interface MapViewContainerProps {
-  initialRegion: any;
-  farmacias: Farmacia[];
-  onSelectFarmacia: (farmacia: Farmacia) => void;
-}
-
-export const MapViewContainer = forwardRef<any, MapViewContainerProps>(
-  ({ initialRegion, farmacias, onSelectFarmacia }, ref) => {
+export const MapViewContainer = forwardRef<MapView, MapViewContainerProps>(
+  (
+    { initialRegion, farmacias, farmaciaSelecionadaId, mapPadding, onMapReady, onSelectFarmacia, onPressMapa },
+    ref
+  ) => {
     const theme = useTheme();
 
-    if (Platform.OS === 'web' || !MapView) {
-      return null;
-    }
+    const handlePressMapa = (event: MapPressEvent) => {
+      // No iOS o toque em um marcador também dispara o onPress do mapa.
+      if (event.nativeEvent.action === 'marker-press') {
+        return;
+      }
+      onPressMapa?.();
+    };
 
     return (
-      <View style={styles.container}>
-        <MapView
-          ref={ref}
-          provider={PROVIDER_GOOGLE}
-          style={styles.map}
-          initialRegion={initialRegion}
-          showsUserLocation={false}
-          showsMyLocationButton={false}
-          zoomControlEnabled={true}
-          toolbarEnabled={false}
-        >
-          {farmacias.map((farmacia) => (
-            <Marker
-              key={farmacia.id}
-              coordinate={{
-                latitude: farmacia.latitude,
-                longitude: farmacia.longitude,
-              }}
-              title={farmacia.nome}
-              description={`${farmacia.endereco} - ${farmacia.bairro}`}
-              pinColor={theme.colors.primary}
-              onPress={() => onSelectFarmacia(farmacia)}
-            />
-          ))}
-        </MapView>
-      </View>
+      <MapView
+        ref={ref}
+        provider={PROVIDER_GOOGLE}
+        style={styles.map}
+        initialRegion={initialRegion}
+        mapPadding={mapPadding}
+        showsUserLocation={false}
+        showsMyLocationButton={false}
+        zoomControlEnabled
+        // A barra nativa de atalhos do marcador (abrir no Maps) duplicaria o botão
+        // "Traçar rota" e ficaria sobreposta ao painel de detalhes.
+        toolbarEnabled={false}
+        onMapReady={onMapReady}
+        onPress={handlePressMapa}
+      >
+        {farmacias.map((farmacia) => (
+          <Marker
+            key={farmacia.id}
+            coordinate={{ latitude: farmacia.latitude, longitude: farmacia.longitude }}
+            pinColor={farmacia.id === farmaciaSelecionadaId ? theme.colors.secondary : theme.colors.primary}
+            onPress={() => onSelectFarmacia(farmacia)}
+            accessibilityLabel={`Farmácia ${farmacia.nome}, ${farmacia.bairro}`}
+            accessibilityRole="button"
+          />
+        ))}
+      </MapView>
     );
   }
 );
@@ -63,11 +54,7 @@ export const MapViewContainer = forwardRef<any, MapViewContainerProps>(
 MapViewContainer.displayName = 'MapViewContainer';
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   map: {
-    width: '100%',
-    height: '100%',
+    flex: 1,
   },
 });
