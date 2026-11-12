@@ -1,40 +1,42 @@
-import React, { forwardRef } from 'react';
+import { forwardRef } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
+import type MapView from 'react-native-maps';
 import { Card, List, Text, useTheme } from 'react-native-paper';
 
 import { spacing } from '@/theme';
-import { Farmacia } from '@/types';
 
-interface MapViewContainerProps {
-  initialRegion: any;
-  farmacias: Farmacia[];
-  onSelectFarmacia: (farmacia: Farmacia) => void;
-}
+import { MapViewContainerProps } from './MapViewContainer.types';
 
-export const MapViewContainer = forwardRef<any, MapViewContainerProps>(
-  ({ farmacias, onSelectFarmacia }, _ref) => {
+// react-native-maps não tem suporte à web; aqui as farmácias são exibidas em lista.
+export const MapViewContainer = forwardRef<MapView, MapViewContainerProps>(
+  ({ farmacias, farmaciaSelecionadaId, onSelectFarmacia }, _ref) => {
     const theme = useTheme();
 
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <Card style={styles.noticeCard}>
+        <Card style={[styles.noticeCard, { backgroundColor: theme.colors.primaryContainer }]}>
           <Card.Content>
-            <Text variant="titleMedium" style={{ color: theme.colors.primary, fontWeight: 'bold' }}>
-              Modo de Visualização Web
+            <Text variant="titleMedium" style={[styles.noticeTitle, { color: theme.colors.primary }]}>
+              Modo de visualização web
             </Text>
-            <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: spacing.xs }}>
-              O Google Maps nativo (`react-native-maps`) é voltado para o Android. Na web, veja abaixo as farmácias credenciadas encontradas:
+            <Text variant="bodyMedium" style={[styles.noticeText, { color: theme.colors.onSurfaceVariant }]}>
+              O mapa está disponível apenas no aplicativo Android. Veja abaixo as farmácias credenciadas encontradas:
             </Text>
           </Card.Content>
         </Card>
 
-        <ScrollView contentContainerStyle={{ padding: spacing.md }}>
+        <ScrollView contentContainerStyle={styles.list}>
           {farmacias.map((farmacia) => (
             <Card
               key={farmacia.id}
-              style={styles.farmaciaCard}
+              style={[
+                styles.farmaciaCard,
+                { backgroundColor: theme.colors.surface },
+                farmacia.id === farmaciaSelecionadaId && { borderColor: theme.colors.primary },
+              ]}
               mode="outlined"
               onPress={() => onSelectFarmacia(farmacia)}
+              accessibilityLabel={`Farmácia ${farmacia.nome}, ${farmacia.bairro}`}
             >
               <Card.Title
                 title={farmacia.nome}
@@ -57,10 +59,17 @@ const styles = StyleSheet.create({
   },
   noticeCard: {
     margin: spacing.md,
-    backgroundColor: '#EBF2FF',
+  },
+  noticeTitle: {
+    fontWeight: 'bold',
+  },
+  noticeText: {
+    marginTop: spacing.xs,
+  },
+  list: {
+    padding: spacing.md,
   },
   farmaciaCard: {
     marginBottom: spacing.sm,
-    backgroundColor: '#FFFFFF',
   },
 });

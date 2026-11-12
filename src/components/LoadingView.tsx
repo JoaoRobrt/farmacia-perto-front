@@ -1,6 +1,5 @@
-import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Text } from 'react-native-paper';
+import { ActivityIndicator, Text, useTheme } from 'react-native-paper';
 
 import { spacing } from '@/theme';
 
@@ -9,10 +8,12 @@ interface LoadingViewProps {
 }
 
 export function LoadingView({ message = 'Carregando...' }: LoadingViewProps) {
+  const theme = useTheme();
+
   return (
-    <View style={styles.container}>
+    <View style={styles.container} accessibilityRole="progressbar" accessibilityLabel={message}>
       <ActivityIndicator size="large" />
-      <Text variant="bodyMedium" style={styles.text}>
+      <Text variant="bodyMedium" style={[styles.text, { color: theme.colors.onSurfaceVariant }]}>
         {message}
       </Text>
     </View>
@@ -28,6 +29,5 @@ const styles = StyleSheet.create({
   },
   text: {
     marginTop: spacing.md,
-    color: '#666666',
   },
 });
