@@ -3,3 +3,4 @@ export * from './EmptyView';
 export * from './ErrorView';
 export * from './CampoBusca';
 export * from './PainelFarmacia';
+export * from './CartaoFarmacia';

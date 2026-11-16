@@ -36,6 +36,12 @@
           "resizeMode": "contain",
           "backgroundColor": "#1351B4"
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Sua localização é usada apenas para mostrar onde você está no mapa e não é armazenada."
+        }
       ]
     ],
     "experiments": {

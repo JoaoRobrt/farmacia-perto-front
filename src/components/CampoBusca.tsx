@@ -1,4 +1,5 @@
-import { StyleProp, StyleSheet, ViewStyle } from 'react-native';
+import { ComponentProps } from 'react';
+import { StyleSheet } from 'react-native';
 import { Searchbar, useTheme } from 'react-native-paper';
 
 import { borderRadius } from '@/theme';
@@ -8,7 +9,7 @@ interface CampoBuscaProps {
   value: string;
   onChangeText: (text: string) => void;
   accessibilityLabel?: string;
-  style?: StyleProp<ViewStyle>;
+  style?: ComponentProps<typeof Searchbar>['style'];
 }
 
 export function CampoBusca({

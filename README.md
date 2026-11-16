@@ -4,21 +4,26 @@ Aplicativo para localizar farmácias credenciadas ao **Programa Farmácia Popula
 
 Projeto acadêmico de Sistemas de Informação (UNIFACISA). Município piloto: Campina Grande - PB.
 
-Esta etapa cobre **somente o front-end visual**, com dados mockados localmente. Não há login, geolocalização nem chamadas reais à API.
+Esta etapa cobre **somente o front-end visual**, com dados mockados localmente. Não há login nem chamadas reais à API. A localização do usuário é opcional e só é pedida quando ele toca em "Usar minha localização".
 
 ## Stack
 
 - Expo (managed) + React Native + TypeScript (strict)
 - Expo Router (rotas por arquivos)
 - React Native Paper (Material Design 3), cor primária `#1351B4`
-- `react-native-maps` com provider Google Maps
-- Plataforma alvo: Android
+- `react-native-maps` com provider Google Maps (Android)
+- Leaflet + OpenStreetMap (versão web, onde o `react-native-maps` não funciona)
+- `expo-location` para a localização sob demanda
+- Plataforma alvo: Android (a versão web serve para demonstração)
 
 ## Fluxo
 
 1. **Estados** (`app/index.tsx`): lista pesquisável, ignorando acentos e maiúsculas.
 2. **Municípios** (`app/municipios.tsx`): lista pesquisável do estado escolhido.
-3. **Mapa** (`app/mapa.tsx`): marcadores das farmácias do município. Ao tocar em um marcador abre o painel com nome, endereço e o botão **Traçar rota**. O botão **Trocar** no cabeçalho volta para a seleção de município.
+3. **Mapa** (`app/mapa.tsx`): mapa com um pin por farmácia do município e, rolando a tela, a lista das farmácias com os botões **Ver no mapa** e **Traçar rota**.
+   - Ao tocar em um pin abrem os detalhes da farmácia com o botão **Traçar rota**: em painel lateral em telas largas (tablet, web) e em painel inferior no celular.
+   - O botão de mira no mapa (**Usar minha localização**) pede a permissão e mostra a posição do usuário. A posição fica só em memória e não é enviada nem armazenada.
+   - O botão **Trocar** no cabeçalho volta para a seleção de município.
 
 Todas as telas de dados têm estados de carregando, vazio e erro (com "Tentar novamente").
 
@@ -73,13 +78,13 @@ src/
   components/           busca, carregando, vazio, erro, mapa e painel da farmácia
   data/                 dados mockados (estados, municípios, farmácias fictícias)
   hooks/                useCarregamento (estados de carregando/erro das telas)
-  services/             farmaciaService (mocks) e apiClient (preparado, não usado)
+  services/             farmaciaService (mocks), localizacaoService e apiClient (preparado, não usado)
   theme/                tema Paper, espaçamentos e raios
   types/                Estado, Municipio, Farmacia
   utils/                normalização de busca e abertura da rota
 ```
 
-O mapa usa `MapViewContainer.tsx` no Android e `MapViewContainer.web.tsx` na web, onde o `react-native-maps` não é suportado e as farmácias aparecem em lista.
+O mapa usa `MapViewContainer.tsx` (Google Maps) no Android e `MapViewContainer.web.tsx` na web, que carrega `MapaLeaflet.tsx` (Leaflet + OpenStreetMap) somente no navegador, pois o Leaflet não funciona na renderização estática.
 
 ## Integração com o back-end
 
@@ -100,7 +105,7 @@ Somente `src/services/farmaciaService.ts` muda: substitua o corpo de `listarEsta
 
 ## Fora desta etapa (roadmap)
 
-- Localização do usuário e ordenação por proximidade (ponto de extensão comentado em `app/mapa.tsx`).
+- Ordenação das farmácias por proximidade da localização do usuário.
 - Busca por nome ou bairro.
 - Troca dos mocks pela API real e exibição da data da última sincronização.
 - Importação e sincronização dos dados oficiais (ETL), no repositório do back-end.
