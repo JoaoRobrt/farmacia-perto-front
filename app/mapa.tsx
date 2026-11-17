@@ -1,33 +1,30 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
-import type MapView from 'react-native-maps';
-import { Button, Card, Snackbar, Text, useTheme } from 'react-native-paper';
+import { useCallback, useRef, useState } from 'react';
+import { FlatList, LayoutChangeEvent, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Button, FAB, Snackbar, Text, useTheme } from 'react-native-paper';
 
-import { ErrorView, LoadingView, PainelFarmacia } from '@/components';
+import { CartaoFarmacia, EmptyView, ErrorView, LoadingView, PainelFarmacia } from '@/components';
 import { MapViewContainer } from '@/components/MapViewContainer';
 import { useCarregamento } from '@/hooks/useCarregamento';
-import { listarFarmacias } from '@/services';
+import { Coordenada, listarFarmacias, obterLocalizacaoAtual } from '@/services';
 import { spacing } from '@/theme';
 import { Farmacia } from '@/types';
 import { abrirRotaNoGoogleMaps } from '@/utils/rota';
+import { mensagemDeErro } from '@/utils/texto';
 
-// Região exibida antes do enquadramento dos marcadores (Campina Grande - PB, município piloto).
-const INITIAL_REGION = {
-  latitude: -7.2306,
-  longitude: -35.8811,
-  latitudeDelta: 0.05,
-  longitudeDelta: 0.05,
-};
-
-const ZOOM_UNICA_FARMACIA = 0.015;
-const PADDING_ENQUADRAMENTO = { top: 90, right: 60, bottom: 90, left: 60 };
-const DURACAO_CAMERA_MS = 400;
+// A partir desta largura (tablet, web) os detalhes abrem em painel lateral ao lado do mapa.
+const LARGURA_MINIMA_PAINEL_LATERAL = 768;
+const ALTURA_MINIMA_MAPA = 280;
+const PROPORCAO_ALTURA_MAPA = 0.55;
 
 export default function MapScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const mapRef = useRef<MapView>(null);
+  const listaRef = useRef<FlatList<Farmacia>>(null);
+  const { width, height } = useWindowDimensions();
+
+  const telaLarga = width >= LARGURA_MINIMA_PAINEL_LATERAL;
+  const alturaMapa = Math.max(ALTURA_MINIMA_MAPA, Math.round(height * PROPORCAO_ALTURA_MAPA));
 
   const { municipioId, nome, uf } = useLocalSearchParams<{
     municipioId?: string;
@@ -40,9 +37,11 @@ export default function MapScreen() {
   const titulo = nomeMunicipio && ufSigla ? `${nomeMunicipio} — ${ufSigla}` : 'Mapa';
 
   const [farmaciaSelecionada, setFarmaciaSelecionada] = useState<Farmacia | null>(null);
-  const [alturaPainel, setAlturaPainel] = useState(0);
-  const [mapaPronto, setMapaPronto] = useState(false);
-  const [erroRota, setErroRota] = useState<string | null>(null);
+  const [alturaPainelInferior, setAlturaPainelInferior] = useState(0);
+  const [localizacaoUsuario, setLocalizacaoUsuario] = useState<Coordenada | null>(null);
+  const [buscandoLocalizacao, setBuscandoLocalizacao] = useState(false);
+  const [rolagemHabilitada, setRolagemHabilitada] = useState(true);
+  const [mensagem, setMensagem] = useState<string | null>(null);
 
   const buscarFarmacias = useCallback(
     () => (municipioId ? listarFarmacias(municipioId) : Promise.resolve([])),
@@ -55,64 +54,38 @@ export default function MapScreen() {
     recarregar,
   } = useCarregamento<Farmacia[]>(buscarFarmacias, [], 'Não foi possível carregar as farmácias credenciadas.');
 
-  // Durante o carregamento o mapa é desmontado; por isso o estado dele é reiniciado.
   const handleTentarNovamente = () => {
     setFarmaciaSelecionada(null);
-    setAlturaPainel(0);
-    setMapaPronto(false);
     recarregar();
   };
 
-  // Enquadra os marcadores somente após o mapa estar pronto: no Android, chamadas
-  // de câmera feitas antes do onMapReady são ignoradas.
-  useEffect(() => {
-    const mapa = mapRef.current;
-    if (!mapaPronto || !mapa || farmacias.length === 0) return;
-
-    if (farmacias.length === 1) {
-      const [unica] = farmacias;
-      mapa.animateToRegion(
-        {
-          latitude: unica.latitude,
-          longitude: unica.longitude,
-          latitudeDelta: ZOOM_UNICA_FARMACIA,
-          longitudeDelta: ZOOM_UNICA_FARMACIA,
-        },
-        DURACAO_CAMERA_MS
-      );
-      return;
-    }
-
-    mapa.fitToCoordinates(
-      farmacias.map((f) => ({ latitude: f.latitude, longitude: f.longitude })),
-      { edgePadding: PADDING_ENQUADRAMENTO, animated: true }
-    );
-  }, [farmacias, mapaPronto]);
-
-  // Centraliza a farmácia selecionada. O mapPadding inferior (altura do painel) faz
-  // o centro ser calculado na área visível acima do painel, sem esconder o marcador.
-  useEffect(() => {
-    if (!mapaPronto || !farmaciaSelecionada || alturaPainel === 0) return;
-    mapRef.current?.animateCamera(
-      { center: { latitude: farmaciaSelecionada.latitude, longitude: farmaciaSelecionada.longitude } },
-      { duration: DURACAO_CAMERA_MS }
-    );
-  }, [farmaciaSelecionada, alturaPainel, mapaPronto]);
-
-  const handleLayoutPainel = (event: LayoutChangeEvent) => {
-    setAlturaPainel(Math.round(event.nativeEvent.layout.height));
-  };
-
-  const handleFecharPainel = () => {
+  const handleFecharPainel = useCallback(() => {
     setFarmaciaSelecionada(null);
-    setAlturaPainel(0);
-  };
+    setAlturaPainelInferior(0);
+  }, []);
 
-  const handleTracarRota = async (farmacia: Farmacia) => {
+  const handleTracarRota = useCallback(async (farmacia: Farmacia) => {
     try {
       await abrirRotaNoGoogleMaps(farmacia.latitude, farmacia.longitude);
     } catch {
-      setErroRota('Não foi possível abrir o Google Maps. Verifique se há um navegador ou o app instalado.');
+      setMensagem('Não foi possível abrir o Google Maps. Verifique se há um navegador ou o app instalado.');
+    }
+  }, []);
+
+  const handleVerNoMapa = useCallback((farmacia: Farmacia) => {
+    setFarmaciaSelecionada(farmacia);
+    listaRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, []);
+
+  // A permissão só é pedida quando o usuário toca no botão; a posição fica apenas em memória.
+  const handleUsarLocalizacao = async () => {
+    setBuscandoLocalizacao(true);
+    try {
+      setLocalizacaoUsuario(await obterLocalizacaoAtual());
+    } catch (err) {
+      setMensagem(mensagemDeErro(err, 'Não foi possível obter sua localização.'));
+    } finally {
+      setBuscandoLocalizacao(false);
     }
   };
 
@@ -124,13 +97,19 @@ export default function MapScreen() {
     router.replace(ufSigla ? { pathname: '/municipios', params: { uf: ufSigla } } : '/');
   };
 
-  /*
-   * PONTO DE EXTENSÃO (FASE FUTURA): botão "Usar minha localização" e ordenação por proximidade.
-   * 1. Solicitar permissão de localização somente ao tocar no botão.
-   * 2. Obter a posição atual do dispositivo, sem armazená-la além da consulta (LGPD).
-   * 3. Mover a câmera até a posição (mapRef.current?.animateCamera).
-   * 4. Ordenar as farmácias por proximidade (no app ou na API, decisão em aberto).
-   */
+  const handleLayoutPainelInferior = (event: LayoutChangeEvent) => {
+    setAlturaPainelInferior(Math.round(event.nativeEvent.layout.height));
+  };
+
+  // No celular, gestos sobre o mapa não devem rolar a lista ao mesmo tempo.
+  const bloqueioRolagem =
+    Platform.OS === 'web'
+      ? {}
+      : {
+          onTouchStart: () => setRolagemHabilitada(false),
+          onTouchEnd: () => setRolagemHabilitada(true),
+          onTouchCancel: () => setRolagemHabilitada(true),
+        };
 
   const opcoesHeader = {
     title: titulo,
@@ -180,53 +159,100 @@ export default function MapScreen() {
     );
   }
 
-  return (
+  const painelInferiorAberto = !telaLarga && farmaciaSelecionada !== null;
+
+  const cabecalhoLista = (
     <>
-      <Stack.Screen options={opcoesHeader} />
-      <View style={styles.container}>
-        <MapViewContainer
-          ref={mapRef}
-          initialRegion={INITIAL_REGION}
-          farmacias={farmacias}
-          farmaciaSelecionadaId={farmaciaSelecionada?.id}
-          mapPadding={{ top: 0, right: 0, bottom: alturaPainel, left: 0 }}
-          onMapReady={() => setMapaPronto(true)}
-          onSelectFarmacia={setFarmaciaSelecionada}
-          onPressMapa={handleFecharPainel}
-        />
-
-        {farmacias.length === 0 && (
-          <View style={styles.emptyOverlay}>
-            <Card style={[styles.emptyCard, { backgroundColor: theme.colors.surface }]} mode="elevated">
-              <Card.Content>
-                <Text variant="titleMedium" style={styles.emptyTitle}>
-                  Nenhuma farmácia encontrada neste município
-                </Text>
-                <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
-                  Não há farmácias credenciadas cadastradas em {nomeMunicipio} — {ufSigla}.
-                </Text>
-              </Card.Content>
-            </Card>
-          </View>
-        )}
-
-        {farmaciaSelecionada && (
+      <View style={[styles.areaMapa, { height: alturaMapa }]}>
+        <View style={styles.mapa} {...bloqueioRolagem}>
+          <MapViewContainer
+            farmacias={farmacias}
+            farmaciaSelecionada={farmaciaSelecionada}
+            localizacaoUsuario={localizacaoUsuario}
+            onSelectFarmacia={setFarmaciaSelecionada}
+            onPressMapa={handleFecharPainel}
+          />
+          <FAB
+            icon="crosshairs-gps"
+            size="small"
+            loading={buscandoLocalizacao}
+            disabled={buscandoLocalizacao}
+            onPress={handleUsarLocalizacao}
+            style={[styles.botaoLocalizacao, { backgroundColor: theme.colors.surface }]}
+            color={theme.colors.primary}
+            accessibilityLabel="Usar minha localização"
+          />
+        </View>
+        {telaLarga && farmaciaSelecionada && (
           <PainelFarmacia
             farmacia={farmaciaSelecionada}
             nomeMunicipio={nomeMunicipio}
             uf={ufSigla}
+            variante="lateral"
             onTracarRota={handleTracarRota}
             onFechar={handleFecharPainel}
-            onLayout={handleLayoutPainel}
+          />
+        )}
+      </View>
+
+      {farmacias.length > 0 && (
+        <View style={styles.tituloLista}>
+          <Text variant="titleMedium" style={styles.tituloListaTexto} accessibilityRole="header">
+            Farmácias credenciadas
+          </Text>
+          <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+            {farmacias.length === 1 ? '1 farmácia encontrada' : `${farmacias.length} farmácias encontradas`}
+          </Text>
+        </View>
+      )}
+    </>
+  );
+
+  return (
+    <>
+      <Stack.Screen options={opcoesHeader} />
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <FlatList
+          ref={listaRef}
+          data={farmacias}
+          keyExtractor={(item) => item.id}
+          scrollEnabled={rolagemHabilitada}
+          ListHeaderComponent={cabecalhoLista}
+          contentContainerStyle={{ paddingBottom: (painelInferiorAberto ? alturaPainelInferior : 0) + spacing.md }}
+          ListEmptyComponent={
+            <EmptyView
+              title="Nenhuma farmácia encontrada neste município"
+              message={`Não há farmácias credenciadas cadastradas em ${nomeMunicipio} — ${ufSigla}.`}
+            />
+          }
+          renderItem={({ item }) => (
+            <CartaoFarmacia
+              farmacia={item}
+              selecionada={item.id === farmaciaSelecionada?.id}
+              onVerNoMapa={handleVerNoMapa}
+              onTracarRota={handleTracarRota}
+            />
+          )}
+        />
+
+        {painelInferiorAberto && (
+          <PainelFarmacia
+            farmacia={farmaciaSelecionada}
+            nomeMunicipio={nomeMunicipio}
+            uf={ufSigla}
+            variante="inferior"
+            onTracarRota={handleTracarRota}
+            onFechar={handleFecharPainel}
+            onLayout={handleLayoutPainelInferior}
           />
         )}
 
         <Snackbar
-          visible={erroRota !== null}
-          onDismiss={() => setErroRota(null)}
-          action={{ label: 'OK', onPress: () => setErroRota(null) }}
+          visible={mensagem !== null}
+          onDismiss={() => setMensagem(null)}
+          action={{ label: 'OK', onPress: () => setMensagem(null) }}
         >
-          {erroRota}
+          {mensagem}
         </Snackbar>
       </View>
     </>
@@ -237,18 +263,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  emptyOverlay: {
+  areaMapa: {
+    flexDirection: 'row',
+  },
+  mapa: {
+    flex: 1,
+  },
+  botaoLocalizacao: {
     position: 'absolute',
     top: spacing.md,
-    left: spacing.md,
     right: spacing.md,
   },
-  emptyCard: {
-    width: '100%',
+  tituloLista: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
   },
-  emptyTitle: {
+  tituloListaTexto: {
     fontWeight: 'bold',
-    marginBottom: spacing.xs,
   },
   botaoHeader: {
     minHeight: 48,

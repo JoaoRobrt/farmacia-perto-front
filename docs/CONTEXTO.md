@@ -1,6 +1,6 @@
 # Farmácia Perto — Contexto do Projeto
 
-Arquivo de contexto para ser lido por qualquer assistente de IA (ou pessoa) que for trabalhar no projeto. Se usar Claude Code, pode renomear para `CLAUDE.md` na raiz do repositório.
+Arquivo de contexto para ser lido por qualquer assistente de IA (ou pessoa) que for trabalhar no projeto.
 
 ---
 
