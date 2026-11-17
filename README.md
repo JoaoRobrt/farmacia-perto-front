@@ -91,13 +91,15 @@ O mapa usa `MapViewContainer.tsx` (Google Maps) no Android e `MapViewContainer.w
 Este repositório contém **apenas o app**. A API, o banco de dados e a importação dos dados oficiais ficam no repositório do back-end. O app nunca acessa banco ou fonte oficial diretamente.
 
 - A URL da API vem de `EXPO_PUBLIC_API_URL`. Copie `.env.example` para `.env` e preencha o valor. O `.env` não é versionado.
-- Contrato esperado (a confirmar com o back), com respostas em JSON nos formatos de `src/types`:
+- Contrato da API (confirmado e implementado no back-end), com respostas em JSON nos formatos de `src/types`. O app ainda usa os mocks e não consome a API nesta etapa.
 
 | Método | Endpoint | Resposta |
 |---|---|---|
 | GET | `/estados` | `Estado[]` |
 | GET | `/estados/{uf}/municipios` | `Municipio[]` |
 | GET | `/municipios/{id}/farmacias` | `Farmacia[]` |
+
+Erros devolvem `{ "mensagem": "..." }`: 400 para parâmetro inválido, 404 para UF ou município inexistente e para rota desconhecida, 500 para falha inesperada.
 
 ### Como trocar os mocks pela API
 
