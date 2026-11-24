@@ -4,7 +4,7 @@ Aplicativo para localizar farmácias credenciadas ao **Programa Farmácia Popula
 
 Projeto acadêmico de Sistemas de Informação (UNIFACISA). Município piloto: Campina Grande - PB.
 
-Esta etapa cobre **somente o front-end visual**, com dados mockados localmente. Não há login nem chamadas reais à API. A localização do usuário é opcional e só é pedida quando ele toca em "Usar minha localização".
+Este repositório contém o app, que obtém estados, municípios e farmácias da API do back-end. Não há login. A localização do usuário é opcional e só é pedida quando ele toca em "Usar minha localização".
 
 ## Stack
 
@@ -35,6 +35,16 @@ Pré-requisitos: Node.js LTS e o app **Expo Go** instalado no Android (ou um emu
 npm ci
 ```
 
+O app exige a API do back-end rodando. Copie `.env.example` para `.env` e preencha `EXPO_PUBLIC_API_URL` conforme o destino:
+
+| Destino | Valor |
+|---|---|
+| Web no próprio PC | `http://localhost:3000` |
+| Emulador Android | `http://10.0.2.2:3000` |
+| Celular na mesma rede | `http://<IP do PC>:3000` |
+
+Ao alterar o `.env`, reinicie o Expo.
+
 ```bash
 npx expo start
 ```
@@ -54,6 +64,8 @@ npx expo run:android
 ```
 
 ou, pela nuvem, `npx eas-cli@latest build --profile development --platform android`.
+
+O build na nuvem não recebe o `.env`: defina `EXPO_PUBLIC_API_URL` no ambiente do build. Build de release exige URL https, pois o Android bloqueia http nesse tipo de build.
 
 ### Verificações
 
@@ -76,9 +88,8 @@ app/                    rotas (Expo Router)
 assets/images/          ícone, splash e favicon (placeholders)
 src/
   components/           busca, carregando, vazio, erro, mapa e painel da farmácia
-  data/                 dados mockados (estados, municípios, farmácias fictícias)
   hooks/                useCarregamento (estados de carregando/erro das telas)
-  services/             farmaciaService (mocks), localizacaoService e apiClient (preparado, não usado)
+  services/             farmaciaService (consultas à API), localizacaoService e apiClient (cliente HTTP)
   theme/                tema Paper, espaçamentos e raios
   types/                Estado, Municipio, Farmacia
   utils/                normalização de busca e abertura da rota
@@ -90,8 +101,8 @@ O mapa usa `MapViewContainer.tsx` (Google Maps) no Android e `MapViewContainer.w
 
 Este repositório contém **apenas o app**. A API, o banco de dados e a importação dos dados oficiais ficam no repositório do back-end. O app nunca acessa banco ou fonte oficial diretamente.
 
-- A URL da API vem de `EXPO_PUBLIC_API_URL`. Copie `.env.example` para `.env` e preencha o valor. O `.env` não é versionado.
-- Contrato da API (confirmado e implementado no back-end), com respostas em JSON nos formatos de `src/types`. O app ainda usa os mocks e não consome a API nesta etapa.
+- A URL da API vem de `EXPO_PUBLIC_API_URL`, sem valor padrão, e precisa começar com `http://` ou `https://` (ver "Como rodar"). O `.env` não é versionado.
+- Contrato da API (confirmado e implementado no back-end), com respostas em JSON nos formatos de `src/types`. O app consome os três endpoints abaixo.
 
 | Método | Endpoint | Resposta |
 |---|---|---|
@@ -101,15 +112,11 @@ Este repositório contém **apenas o app**. A API, o banco de dados e a importa�
 
 Erros devolvem `{ "mensagem": "..." }`: 400 para parâmetro inválido, 404 para UF ou município inexistente e para rota desconhecida, 500 para falha inesperada.
 
-### Como trocar os mocks pela API
-
-Somente `src/services/farmaciaService.ts` muda: substitua o corpo de `listarEstados`, `listarMunicipios` e `listarFarmacias` pelas chamadas a `apiGet` (de `src/services/apiClient.ts`). A implementação está descrita no comentário ao final do arquivo. Telas e componentes não precisam ser alterados.
-
 ## Fora desta etapa (roadmap)
 
 - Ordenação das farmácias por proximidade da localização do usuário.
 - Busca por nome ou bairro.
-- Troca dos mocks pela API real e exibição da data da última sincronização.
+- Exibição da data da última sincronização.
 - Importação e sincronização dos dados oficiais (ETL), no repositório do back-end.
 - Agrupamento de marcadores por zoom.
 - Ícone e splash definitivos (substituir os arquivos em `assets/images/`).

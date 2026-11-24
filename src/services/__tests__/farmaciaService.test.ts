@@ -1,62 +1,127 @@
-import { estados, farmacias, municipios } from '../../data';
 import { listarEstados, listarFarmacias, listarMunicipios } from '../farmaciaService';
 
-describe('listarEstados', () => {
-  it('retorna as 27 unidades federativas sem siglas repetidas', async () => {
-    const resultado = await listarEstados();
+const URL_ORIGINAL = process.env.EXPO_PUBLIC_API_URL;
 
-    expect(resultado).toHaveLength(27);
-    expect(new Set(resultado.map((e) => e.sigla)).size).toBe(27);
-    expect(resultado).toContainEqual({ sigla: 'PB', nome: 'Paraíba' });
-  });
-});
+const MSG_REDE = 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.';
 
-describe('listarMunicipios', () => {
-  it('retorna apenas os municípios da UF informada', async () => {
-    const resultado = await listarMunicipios('PB');
+function respostaHttp(status: number, corpo: unknown) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    text: async () => JSON.stringify(corpo),
+  } as unknown as Response;
+}
 
-    expect(resultado.length).toBeGreaterThan(0);
-    expect(resultado.every((m) => m.uf === 'PB')).toBe(true);
-    expect(resultado.map((m) => m.nome)).toEqual(expect.arrayContaining(['Campina Grande', 'João Pessoa']));
-  });
+describe('farmaciaService', () => {
+  let fetchMock: jest.Mock;
 
-  it('ignora maiúsculas e minúsculas na UF', async () => {
-    expect(await listarMunicipios('pb')).toEqual(await listarMunicipios('PB'));
+  beforeEach(() => {
+    process.env.EXPO_PUBLIC_API_URL = 'http://api.local';
+    fetchMock = jest.fn();
+    globalThis.fetch = fetchMock;
   });
 
-  it('retorna lista vazia para UF sem municípios cadastrados', async () => {
-    expect(await listarMunicipios('AC')).toEqual([]);
-  });
-});
-
-describe('listarFarmacias', () => {
-  it('retorna apenas as farmácias do município informado', async () => {
-    const resultado = await listarFarmacias('pb-campina-grande');
-
-    expect(resultado).toHaveLength(12);
-    expect(resultado.every((f) => f.municipioId === 'pb-campina-grande')).toBe(true);
+  afterEach(() => {
+    if (URL_ORIGINAL === undefined) {
+      delete process.env.EXPO_PUBLIC_API_URL;
+    } else {
+      process.env.EXPO_PUBLIC_API_URL = URL_ORIGINAL;
+    }
   });
 
-  it('retorna lista vazia para município sem farmácias', async () => {
-    expect(await listarFarmacias('pb-patos')).toEqual([]);
+  describe('listarEstados', () => {
+    it('busca /estados e devolve a lista recebida da API', async () => {
+      const estados = [
+        { sigla: 'AC', nome: 'Acre' },
+        { sigla: 'PB', nome: 'Paraíba' },
+      ];
+      fetchMock.mockResolvedValue(respostaHttp(200, estados));
+
+      expect(await listarEstados()).toEqual(estados);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe('http://api.local/estados');
+    });
+
+    it('devolve lista vazia quando a API responde []', async () => {
+      fetchMock.mockResolvedValue(respostaHttp(200, []));
+
+      expect(await listarEstados()).toEqual([]);
+    });
   });
-});
 
-describe('consistência dos dados mockados', () => {
-  it('toda farmácia pertence a um município cadastrado', () => {
-    const idsMunicipios = new Set(municipios.map((m) => m.id));
+  describe('listarMunicipios', () => {
+    it('busca os municípios da UF informada e devolve a lista recebida', async () => {
+      const municipios = [{ id: 'pb-campina-grande', nome: 'Campina Grande', uf: 'PB' }];
+      fetchMock.mockResolvedValue(respostaHttp(200, municipios));
 
-    expect(farmacias.filter((f) => !idsMunicipios.has(f.municipioId))).toEqual([]);
+      expect(await listarMunicipios('PB')).toEqual(municipios);
+      expect(fetchMock.mock.calls[0][0]).toBe('http://api.local/estados/PB/municipios');
+    });
+
+    it('envia a UF como foi informada, sem trocar maiúsculas e minúsculas', async () => {
+      fetchMock.mockResolvedValue(respostaHttp(200, []));
+
+      await listarMunicipios('pb');
+
+      expect(fetchMock.mock.calls[0][0]).toBe('http://api.local/estados/pb/municipios');
+    });
+
+    it('codifica caracteres especiais da UF no caminho', async () => {
+      fetchMock.mockResolvedValue(respostaHttp(200, []));
+
+      await listarMunicipios('P/B?x=1');
+
+      expect(fetchMock.mock.calls[0][0]).toBe('http://api.local/estados/P%2FB%3Fx%3D1/municipios');
+    });
   });
 
-  it('todo município pertence a uma UF cadastrada', () => {
-    const siglas = new Set(estados.map((e) => e.sigla));
+  describe('listarFarmacias', () => {
+    it('busca as farmácias do município informado e devolve a lista recebida', async () => {
+      const farmacias = [{ id: 'f1', nome: 'Farmácia Central', municipioId: 'pb-campina-grande' }];
+      fetchMock.mockResolvedValue(respostaHttp(200, farmacias));
 
-    expect(municipios.filter((m) => !siglas.has(m.uf))).toEqual([]);
+      expect(await listarFarmacias('pb-campina-grande')).toEqual(farmacias);
+      expect(fetchMock.mock.calls[0][0]).toBe('http://api.local/municipios/pb-campina-grande/farmacias');
+    });
+
+    it('codifica caracteres especiais do id do município no caminho', async () => {
+      fetchMock.mockResolvedValue(respostaHttp(200, []));
+
+      await listarFarmacias('a/b#c d');
+
+      expect(fetchMock.mock.calls[0][0]).toBe('http://api.local/municipios/a%2Fb%23c%20d/farmacias');
+    });
   });
 
-  it('não há ids repetidos de farmácias nem de municípios', () => {
-    expect(new Set(farmacias.map((f) => f.id)).size).toBe(farmacias.length);
-    expect(new Set(municipios.map((m) => m.id)).size).toBe(municipios.length);
+  describe('erros da API', () => {
+    it.each([
+      ['listarEstados', () => listarEstados()],
+      ['listarMunicipios', () => listarMunicipios('PB')],
+      ['listarFarmacias', () => listarFarmacias('pb-campina-grande')],
+    ])('%s repassa a mensagem de erro devolvida pela API', async (_nome, chamar) => {
+      fetchMock.mockResolvedValue(respostaHttp(404, { mensagem: 'Recurso não encontrado' }));
+
+      await expect(chamar()).rejects.toThrow(new Error('Recurso não encontrado'));
+    });
+
+    it.each([
+      ['listarEstados', () => listarEstados()],
+      ['listarMunicipios', () => listarMunicipios('PB')],
+      ['listarFarmacias', () => listarFarmacias('pb-campina-grande')],
+    ])('%s rejeita com a mensagem de falha de rede quando o fetch rejeita', async (_nome, chamar) => {
+      fetchMock.mockRejectedValue(new TypeError('Network request failed'));
+
+      await expect(chamar()).rejects.toThrow(new Error(MSG_REDE));
+    });
+
+    it.each([
+      ['listarEstados', () => listarEstados()],
+      ['listarMunicipios', () => listarMunicipios('PB')],
+      ['listarFarmacias', () => listarFarmacias('pb-campina-grande')],
+    ])('%s rejeita resposta 200 que não é uma lista', async (_nome, chamar) => {
+      fetchMock.mockResolvedValue(respostaHttp(200, { sigla: 'PB' }));
+
+      await expect(chamar()).rejects.toThrow(new Error('Resposta inválida da API. Tente novamente.'));
+    });
   });
 });
