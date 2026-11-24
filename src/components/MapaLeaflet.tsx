@@ -86,7 +86,8 @@ export function MapaLeaflet(props: MapViewContainerProps) {
       zoom={ZOOM_INICIAL}
       // Evita que a rolagem da página fique presa no mapa; o zoom continua pelos botões e gestos.
       scrollWheelZoom={false}
-      style={{ height: '100%', width: '100%' }}
+      // Contexto de empilhamento próprio: sem ele, as camadas do Leaflet (z-index 200 a 1000) cobrem o que está sobre o mapa.
+      style={{ height: '100%', width: '100%', zIndex: 0 }}
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
