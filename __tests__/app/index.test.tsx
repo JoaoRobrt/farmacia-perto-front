@@ -88,6 +88,33 @@ describe('Tela de seleção de estado', () => {
     expect(screen.getByText('Não encontramos nenhum estado correspondente a "xyz".')).toBeOnTheScreen();
   });
 
+  it.each([
+    ['sem busca', ''],
+    ['com a busca só com espaços', '   '],
+  ])('mostra "Nenhum estado cadastrado." quando a lista vem vazia %s', async (_descricao, busca) => {
+    listarEstadosMock.mockResolvedValue([]);
+    await renderizar(<SelectingStateScreen />);
+    expect(await screen.findByText('Nenhum estado encontrado')).toBeOnTheScreen();
+
+    if (busca) {
+      await fireEvent.changeText(screen.getByPlaceholderText('Buscar estado por nome ou sigla...'), busca);
+    }
+
+    expect(screen.getByText('Nenhum estado cadastrado.')).toBeOnTheScreen();
+    expect(screen.queryByText(/Não encontramos nenhum estado/)).not.toBeOnTheScreen();
+  });
+
+  it('mostra a mensagem da busca, e não a de lista vazia, quando a lista vem vazia e há texto digitado', async () => {
+    listarEstadosMock.mockResolvedValue([]);
+    await renderizar(<SelectingStateScreen />);
+    await screen.findByText('Nenhum estado encontrado');
+
+    await fireEvent.changeText(screen.getByPlaceholderText('Buscar estado por nome ou sigla...'), 'xyz');
+
+    expect(screen.getByText('Não encontramos nenhum estado correspondente a "xyz".')).toBeOnTheScreen();
+    expect(screen.queryByText('Nenhum estado cadastrado.')).not.toBeOnTheScreen();
+  });
+
   it('navega para os municípios do estado tocado', async () => {
     await renderizar(<SelectingStateScreen />);
 

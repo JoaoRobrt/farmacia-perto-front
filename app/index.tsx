@@ -63,7 +63,11 @@ export default function SelectingStateScreen() {
         ListEmptyComponent={
           <EmptyView
             title="Nenhum estado encontrado"
-            message={`Não encontramos nenhum estado correspondente a "${searchQuery}".`}
+            message={
+              searchQuery.trim()
+                ? `Não encontramos nenhum estado correspondente a "${searchQuery}".`
+                : 'Nenhum estado cadastrado.'
+            }
           />
         }
         renderItem={({ item }) => (
